@@ -1,6 +1,11 @@
 use serde::{Serialize,Deserialize};
 use reqwest::{Url, Client};
 
+use crate::error::Error;
+
+const TRANSLATE_ENDPOINT: &str = 
+    "https://api.funtranslations.com/translate/shakespeare.json";
+
 #[derive(Debug,Serialize)]
 struct TranslationPayload {
     text: String,
@@ -24,21 +29,18 @@ impl TranslationPayload {
     }
 }
 
-const TRANSLATE_ENDPOINT: &str = 
-    "https://api.funtranslations.com/translate/shakespeare.json";
-
-pub async fn translate(text: &str) -> String {
+pub async fn translate(text: &str) -> Result<String, Error> {
     let url = Url::parse(TRANSLATE_ENDPOINT).unwrap();
-
     let client = Client::new();
-    client.post(url)
+
+    let response = client.post(url)
         .form(&TranslationPayload::new(text.to_owned()))
         .send()
-        .await
-        .unwrap()
+        .await?;
+
+    let translation = response
         .json::<TranslationResponse>()
-        .await
-        .unwrap()
-        .contents
-        .translated
+        .await?;
+
+    Ok(translation.contents.translated)
 }

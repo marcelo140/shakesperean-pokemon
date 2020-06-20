@@ -1,5 +1,7 @@
 use serde::Deserialize;
 
+use crate::error::Error;
+
 const SPECIES_ENDPOINT: &str = "https://pokeapi.co/api/v2/pokemon-species/";
 
 #[derive(Debug,Clone,Deserialize)]
@@ -19,22 +21,24 @@ struct Language {
 }
 
 impl Pokemon {
-    pub fn flavor_text(&self, lang: &str) -> &str {
+    pub fn flavor_text(&self, lang: &str) -> Option<&str> {
         self.flavor_text_entries.iter()
             .rev()
             .find(|ft| ft.language.name == lang)
-            .unwrap()
-            .flavor_text
-            .as_str()
+            .map(|ft| ft.flavor_text.as_str())
     }
 }
 
-pub async fn species(pokemon: &str) -> Pokemon {
-    reqwest::get(&(SPECIES_ENDPOINT.to_owned() + pokemon)) 
-        .await
-        .unwrap()
-        .json::<Pokemon>()
-        .await
-        .unwrap()
+pub async fn species(pokemon: &str) -> Result<Pokemon, Error> {
+    let url = SPECIES_ENDPOINT.to_owned() + pokemon;
+    let response = reqwest::get(&url)
+        .await?;
+
+    if response.status().as_u16() == 404 {
+        return Err(Error::no_pokemon(pokemon));
+    }
+
+    let pokemon = response.json::<Pokemon>().await?;
+    Ok(pokemon)
 }
 
