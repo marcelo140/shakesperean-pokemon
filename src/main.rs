@@ -1,8 +1,10 @@
 use actix_web::{web, get, HttpServer, App, Responder};
+use shakesperean_pokemon::services;
 
 #[get("/pokemon/{name}")]
 async fn pokemon(info: web::Path::<String>) -> impl Responder {
-    format!("Hello {}", info)
+    let pokemon = services::pokemon::species(&info).await;
+    pokemon.flavor_text("en").to_owned()
 }
 
 #[actix_rt::main]
