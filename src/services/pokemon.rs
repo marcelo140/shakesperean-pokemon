@@ -37,3 +37,4 @@ pub async fn species(pokemon: &str) -> Pokemon {
         .await
         .unwrap()
 }
+

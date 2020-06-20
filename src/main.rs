@@ -1,10 +1,29 @@
-use actix_web::{web, get, HttpServer, App, Responder};
+use serde::Serialize;
+use actix_web::{web, get, HttpServer, App, HttpResponse};
 use shakesperean_pokemon::services;
 
+#[derive(Debug,Serialize)]
+struct ShakesMon {
+    name: String,
+    description: String,
+}
+
+impl ShakesMon {
+    fn new(name: String, description: String) -> Self {
+        ShakesMon {
+            name,
+            description,
+        }
+    }
+}
+
 #[get("/pokemon/{name}")]
-async fn pokemon(info: web::Path::<String>) -> impl Responder {
+async fn pokemon(info: web::Path::<String>) -> HttpResponse {
     let pokemon = services::pokemon::species(&info).await;
-    pokemon.flavor_text("en").to_owned()
+    let flavor = pokemon.flavor_text("en");
+    let shaks = services::shakespeare::translate(flavor).await;
+
+    HttpResponse::Ok().json(ShakesMon::new(info.into_inner(), shaks))
 }
 
 #[actix_rt::main]
