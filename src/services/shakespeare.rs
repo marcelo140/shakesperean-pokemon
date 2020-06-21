@@ -1,5 +1,5 @@
 use serde::{Serialize,Deserialize};
-use reqwest::{Url, Client};
+use reqwest::{Url, Client, StatusCode};
 use log::debug;
 
 use crate::error::Error;
@@ -22,6 +22,17 @@ struct TranslationContents {
     translated: String,
 }
 
+#[derive(Debug,Deserialize)]
+struct TranslationError {
+    error: TranslationErrorDescription,
+}
+
+#[derive(Debug,Deserialize)]
+struct TranslationErrorDescription {
+    code: u16,
+    message: String,
+}
+
 impl TranslationPayload {
     fn new (text: String) -> Self {
         TranslationPayload {
@@ -42,10 +53,12 @@ pub async fn translate(text: &str) -> Result<String, Error> {
         .send()
         .await?;
 
-    let translation = response
-        .json::<TranslationResponse>()
-        .await?;
+    if response.status() == StatusCode::TOO_MANY_REQUESTS {
+        let mut msg: TranslationError = response.json().await?;
+        return Err(Error::translation_api_rate(&msg.error.message.split_off(19)));
+    }
 
+    let translation: TranslationResponse = response.json().await?;
     Ok(translation.contents.translated)
 }
 

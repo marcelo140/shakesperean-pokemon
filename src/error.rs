@@ -1,11 +1,20 @@
-use std::fmt;
 use actix_web::{HttpResponse,ResponseError};
+use serde::Serialize;
+
+use std::fmt;
+use std::error::Error as StdError;
 
 #[derive(Debug)]
 pub enum Error {
     PokemonNotFound(String),
     NoFlavorFound(String),
     NetworkError(reqwest::Error),
+    TranslationApiRate(String),
+}
+
+#[derive(Serialize,Debug)]
+struct HttpError {
+    error: String, 
 }
 
 impl fmt::Display for Error {
@@ -17,6 +26,8 @@ impl fmt::Display for Error {
                 write!(f, "No flavor text was found for {}", pokemon),
             Error::NetworkError(err) => 
                 write!(f, "Network error: {}", err),
+            Error::TranslationApiRate(msg) =>
+                write!(f, "FunTranslations API error: {}", msg),
         }
     }
 }
@@ -28,6 +39,10 @@ impl Error {
 
     pub fn no_flavor(pokemon: &str) -> Self {
         Error::NoFlavorFound(pokemon.to_owned())
+    }
+
+    pub fn translation_api_rate(msg: &str) -> Self {
+        Error::TranslationApiRate(msg.to_owned())
     }
 }
 
@@ -46,6 +61,20 @@ impl ResponseError for Error {
                 HttpResponse::NoContent().finish(),
             Error::NetworkError(_) =>
                 HttpResponse::InternalServerError().finish(),
+            Error::TranslationApiRate(msg) => {
+                let msg = format!("FunTranslations API rate limit reached: {}", msg);
+                HttpResponse::InternalServerError()
+                    .json(HttpError { error: msg })
+            }
+        }
+    }
+}
+
+impl StdError for Error {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self {
+            Error::NetworkError(src) => Some(src),
+            _ => None,
         }
     }
 }

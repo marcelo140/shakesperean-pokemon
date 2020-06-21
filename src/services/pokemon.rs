@@ -2,6 +2,7 @@ use serde::Deserialize;
 use log::debug;
 
 use crate::error::Error;
+use reqwest::StatusCode;
 
 const SPECIES_ENDPOINT: &str = "https://pokeapi.co/api/v2/pokemon-species/";
 
@@ -42,7 +43,7 @@ pub async fn species(pokemon: &str) -> Result<Pokemon, Error> {
     let response = reqwest::get(&url)
         .await?;
 
-    if response.status().as_u16() == 404 {
+    if response.status() == StatusCode::NOT_FOUND {
         return Err(Error::no_pokemon(pokemon));
     }
 
