@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use log::debug;
 
 use crate::error::Error;
 
@@ -34,7 +35,10 @@ impl Pokemon {
 
 /// Fetches information about a Pokémon from PokéAPI. 
 pub async fn species(pokemon: &str) -> Result<Pokemon, Error> {
+    debug!("Looking for {} in PokeAPI", pokemon);
+
     let url = SPECIES_ENDPOINT.to_owned() + pokemon;
+
     let response = reqwest::get(&url)
         .await?;
 

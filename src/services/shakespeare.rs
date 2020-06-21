@@ -1,5 +1,6 @@
 use serde::{Serialize,Deserialize};
 use reqwest::{Url, Client};
+use log::debug;
 
 use crate::error::Error;
 
@@ -31,6 +32,8 @@ impl TranslationPayload {
 
 /// Translates the input into shakespearan using FunTranslations API.
 pub async fn translate(text: &str) -> Result<String, Error> {
+    debug!("Performing shakespeare translation through FunTranslations API");
+
     let url = Url::parse(TRANSLATE_ENDPOINT).unwrap();
     let client = Client::new();
 
