@@ -3,19 +3,22 @@ use cached::Cached;
 use cached::stores::SizedCache;
 use log::debug;
 
-use shakesperean_pokemon::services;
-use shakesperean_pokemon::services::shakesperean_pokemon::ShakesMon;
+use shakesperean_pokemon::services::shakesperean_pokemon::{ShakesMonService, ShakesMon};
 use shakesperean_pokemon::error::Error;
 use std::sync::Mutex;
 
+const FUN_TRANSLATION_API_KEY: &str = "FUN_TRANSLATION_API_KEY";
+
 struct AppState {
     cache: Mutex<SizedCache<String, ShakesMon>>,
+    pokemon_service: ShakesMonService,
 }
 
 impl AppState {
-    fn new() -> Self {
+    fn new(api_key: Option<String>) -> Self {
         AppState {
             cache: Mutex::new(SizedCache::with_size(2048)),
+            pokemon_service: ShakesMonService::new(api_key),
         }
     }
 }
@@ -39,7 +42,7 @@ async fn cached_pokemon(info: web::Path::<String>, state: web::Data<AppState>)
         }
     }
 
-    let result = services::shakesperean_pokemon::pokemon(&pokemon).await?;
+    let result = state.pokemon_service.fetch_description(&pokemon).await?;
 
     let mut cache = state.cache.lock().unwrap();
     cache.cache_set(pokemon, result.clone());
@@ -49,13 +52,14 @@ async fn cached_pokemon(info: web::Path::<String>, state: web::Data<AppState>)
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
-    let state = web::Data::new(AppState::new());
-
     env_logger::init();
+
+    let api_key = std::env::var(FUN_TRANSLATION_API_KEY).ok();
+    let app_state = web::Data::new(AppState::new(api_key));
 
     HttpServer::new(move || {
         App::new()
-            .app_data(state.clone())
+            .app_data(app_state.clone())
             .service(cached_pokemon)
             .service(healthcheck)
     })
@@ -72,7 +76,9 @@ mod tests {
     #[actix_rt::test]
     async fn pokemon_endpoint() {
         let mut app = test::init_service(
-            App::new().service(cached_pokemon).app_data(web::Data::new(AppState::new()))
+            App::new()
+            .service(cached_pokemon)
+            .app_data(web::Data::new(AppState::new(None)))
         ).await;
 
         let req = TestRequest::get().uri("/pokemon/charizard").to_request();
@@ -85,7 +91,9 @@ mod tests {
     #[actix_rt::test]
     async fn pokemon_endpoint_404() {
         let mut app = test::init_service(
-            App::new().service(cached_pokemon).app_data(web::Data::new(AppState::new()))
+            App::new()
+            .service(cached_pokemon)
+            .app_data(web::Data::new(AppState::new(None)))
         ).await;
 
         let req = TestRequest::get().uri("/pokemon/charizarda").to_request();

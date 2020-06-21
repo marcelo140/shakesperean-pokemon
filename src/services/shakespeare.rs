@@ -42,16 +42,23 @@ impl TranslationPayload {
 }
 
 /// Translates the input into shakespearan using FunTranslations API.
-pub async fn translate(text: &str) -> Result<String, Error> {
+pub async fn translate(text: &str, api_key: &Option<String>) -> Result<String, Error> {
     debug!("Performing shakespeare translation through FunTranslations API");
 
     let url = Url::parse(TRANSLATE_ENDPOINT).unwrap();
     let client = Client::new();
 
-    let response = client.post(url)
-        .form(&TranslationPayload::new(text.to_owned()))
-        .send()
-        .await?;
+    let request = match api_key {
+        Some(key) => client
+            .post(url)
+            .form(&TranslationPayload::new(text.to_owned()))
+            .header("X-FunTranslations-Api-Secret", key),
+        None => client
+            .post(url)
+            .form(&TranslationPayload::new(text.to_owned()))
+    };
+
+    let response = request.send().await?;
 
     if response.status() == StatusCode::TOO_MANY_REQUESTS {
         let mut msg: TranslationError = response.json().await?;
@@ -68,8 +75,10 @@ mod tests {
 
     #[actix_rt::test]
     async fn external_api_test() {
-        let translation = translate("A room without books is like a body without a soul.")
-            .await;
+        let translation = translate(
+            "A room without books is like a body without a soul.", 
+            &None
+        ).await;
 
         assert!(translation.is_ok());
     }
