@@ -20,6 +20,11 @@ impl AppState {
     }
 }
 
+#[get("/healthcheck")]
+async fn healthcheck() -> HttpResponse {
+    HttpResponse::Ok().finish()
+}
+
 #[get("/pokemon/{name}")]
 async fn cached_pokemon(info: web::Path::<String>, state: web::Data<AppState>) 
     -> Result<HttpResponse, Error> 
@@ -52,6 +57,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(state.clone())
             .service(cached_pokemon)
+            .service(healthcheck)
     })
     .bind("localhost:8080")?
     .run()
@@ -86,6 +92,18 @@ mod tests {
         let resp = test::call_service(&mut app, req).await;
 
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[actix_rt::test]
+    async fn healthcheck_endpoint() {
+        let mut app = test::init_service(
+            App::new().service(healthcheck)
+        ).await;
+
+        let req = TestRequest::get().uri("/healthcheck").to_request();
+        let resp = test::call_service(&mut app, req).await;
+
+        assert_eq!(resp.status(), StatusCode::OK);
     }
 }
 
