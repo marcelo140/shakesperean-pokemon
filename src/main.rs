@@ -1,27 +1,12 @@
-use serde::{Serialize,Deserialize};
 use actix_web::{web, get, HttpServer, App, HttpResponse};
 use cached::Cached;
 use cached::stores::SizedCache;
 use log::debug;
 
 use shakesperean_pokemon::services;
+use shakesperean_pokemon::services::shakesperean_pokemon::ShakesMon;
 use shakesperean_pokemon::error::Error;
 use std::sync::Mutex;
-
-#[derive(Debug,Clone,Serialize,Deserialize)]
-struct ShakesMon {
-    name: String,
-    description: String,
-}
-
-impl ShakesMon {
-    fn new(name: String, description: String) -> Self {
-        ShakesMon {
-            name,
-            description,
-        }
-    }
-}
 
 struct AppState {
     cache: Mutex<SizedCache<String, ShakesMon>>,
@@ -36,32 +21,25 @@ impl AppState {
 }
 
 #[get("/pokemon/{name}")]
-async fn pokemon(info: web::Path::<String>, state: web::Data<AppState>) 
+async fn cached_pokemon(info: web::Path::<String>, state: web::Data<AppState>) 
     -> Result<HttpResponse, Error> 
 {
+    let pokemon = info.into_inner();
+
+    {
+        let mut cache = state.cache.lock().unwrap();
+        if let Some(result) = cache.cache_get(&pokemon) {
+            debug!("Found result for {} in cache", pokemon);
+            return Ok(HttpResponse::Ok().json(result));
+        }
+    }
+
+    let result = services::shakesperean_pokemon::pokemon(&pokemon).await?;
+
     let mut cache = state.cache.lock().unwrap();
-    let pokemon_name = info.into_inner();
-    
-    if let Some(result) = cache.cache_get(&pokemon_name) {
-        let response = HttpResponse::Ok().json(result);
+    cache.cache_set(pokemon, result.clone());
 
-        debug!("Found result for {} in cache", pokemon_name);
-        return Ok(response);
-    }
-
-    let pokemon = services::pokemon::species(&pokemon_name).await?;
-    match pokemon.flavor_text("en") {
-        Some(text) => {
-            let translation = services::shakespeare::translate(text).await?;
-
-            let result = ShakesMon::new(pokemon_name.clone(), translation);
-            let response = HttpResponse::Ok().json(result.clone());
-
-            cache.cache_set(pokemon_name, result);
-            Ok(response)
-        },
-        None => Err(Error::no_flavor(&pokemon_name)),
-    }
+    Ok(HttpResponse::Ok().json(result))
 }
 
 #[actix_rt::main]
@@ -73,7 +51,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(state.clone())
-            .service(pokemon)
+            .service(cached_pokemon)
     })
     .bind("localhost:8080")?
     .run()
@@ -88,7 +66,7 @@ mod tests {
     #[actix_rt::test]
     async fn pokemon_endpoint() {
         let mut app = test::init_service(
-            App::new().service(pokemon).app_data(web::Data::new(AppState::new()))
+            App::new().service(cached_pokemon).app_data(web::Data::new(AppState::new()))
         ).await;
 
         let req = TestRequest::get().uri("/pokemon/charizard").to_request();
@@ -101,7 +79,7 @@ mod tests {
     #[actix_rt::test]
     async fn pokemon_endpoint_404() {
         let mut app = test::init_service(
-            App::new().service(pokemon).app_data(web::Data::new(AppState::new()))
+            App::new().service(cached_pokemon).app_data(web::Data::new(AppState::new()))
         ).await;
 
         let req = TestRequest::get().uri("/pokemon/charizarda").to_request();
@@ -110,3 +88,4 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
 }
+
