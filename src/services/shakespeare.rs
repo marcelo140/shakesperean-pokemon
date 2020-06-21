@@ -29,6 +29,7 @@ impl TranslationPayload {
     }
 }
 
+/// Translates the input into shakespearan using FunTranslations API.
 pub async fn translate(text: &str) -> Result<String, Error> {
     let url = Url::parse(TRANSLATE_ENDPOINT).unwrap();
     let client = Client::new();
@@ -43,4 +44,17 @@ pub async fn translate(text: &str) -> Result<String, Error> {
         .await?;
 
     Ok(translation.contents.translated)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[actix_rt::test]
+    async fn external_api_test() {
+        let translation = translate("A room without books is like a body without a soul.")
+            .await;
+
+        assert!(translation.is_ok());
+    }
 }

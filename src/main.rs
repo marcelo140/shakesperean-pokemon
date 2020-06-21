@@ -1,10 +1,10 @@
-use serde::Serialize;
+use serde::{Serialize,Deserialize};
 use actix_web::{web, get, HttpServer, App, HttpResponse};
 
 use shakesperean_pokemon::services;
 use shakesperean_pokemon::error::Error;
 
-#[derive(Debug,Serialize)]
+#[derive(Debug,Serialize,Deserialize)]
 struct ShakesMon {
     name: String,
     description: String,
@@ -44,4 +44,31 @@ async fn main() -> std::io::Result<()> {
         .bind("localhost:8080")?
         .run()
         .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use actix_web::{test, App, http::StatusCode};
+
+    #[actix_rt::test]
+    async fn test_pokemon_endpoint() {
+        let mut app = test::init_service(App::new().service(pokemon)).await;
+
+        let req = test::TestRequest::get().uri("/pokemon/charizard").to_request();
+        let result: ShakesMon = test::read_response_json(&mut app, req).await;
+
+        assert_eq!(result.name, "charizard");
+        assert!(result.description.len() > 0);
+    }
+
+    #[actix_rt::test]
+    async fn test_pokemon_endpoint_404() {
+        let mut app = test::init_service(App::new().service(pokemon)).await;
+
+        let req = test::TestRequest::get().uri("/pokemon/charizarda").to_request();
+        let resp = test::call_service(&mut app, req).await;
+
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
 }
