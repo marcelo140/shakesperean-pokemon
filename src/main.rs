@@ -1,7 +1,9 @@
+use actix_web::middleware::Logger;
 use actix_web::{web, get, HttpServer, App, HttpResponse};
 use cached::Cached;
 use cached::stores::SizedCache;
 use log::debug;
+use env_logger::Env;
 
 use shakesperean_pokemon::services::shakesperean_pokemon::{ShakesMonService, ShakesMon};
 use shakesperean_pokemon::error::Error;
@@ -52,13 +54,14 @@ async fn cached_pokemon(info: web::Path::<String>, state: web::Data<AppState>)
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
-    env_logger::init();
+    env_logger::from_env(Env::default().default_filter_or("info")).init();
 
     let api_key = std::env::var(FUN_TRANSLATION_API_KEY).ok();
     let app_state = web::Data::new(AppState::new(api_key));
 
     HttpServer::new(move || {
         App::new()
+            .wrap(Logger::default())
             .app_data(app_state.clone())
             .service(cached_pokemon)
             .service(healthcheck)
