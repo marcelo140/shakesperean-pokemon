@@ -1,0 +1,66 @@
+openapi: 3.0.1
+info:
+  title: Shakesperean Pokémon
+  description: Fetch Pokémon descriptions translated to Shakespeare.
+  version: '0.1'
+servers:
+  - url: 'http://localhost:8080'
+paths:
+  /healthcheck:
+    get:
+      description: Indicates if the service is online.
+      responses:
+        '200':
+          description: The service is online. 
+      servers:
+        - url: 'http://localhost:8080'
+    servers:
+      - url: 'http://localhost:8080'
+  /pokemon/{name}:
+    get:
+      description: Get a Pokémon description by name.
+      parameters:
+        - in: path
+          name: name
+          schema:
+            type: string
+          required: true
+          description: Name of the Pokémon to get.
+      responses:
+        '200':
+          description: The Pokémon's description in Shakespeare.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  description:
+                    type: string
+              examples:
+                '0':
+                  value: >-
+                    {"name": "charizard",
+                     "description": "Charizard flies 'round the sky in search of powerful opponents. 't breathes fire of such most wondrous heat yond 't melts aught. However, 't nev'r turns its fiery breath on any opponent weaker than itself."
+        '429':
+          description: The server was unable to perform the translation because it reached the rate limit for FunTranslations API.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              examples:
+                '0':
+                  value: >-
+                    {"error":"FunTranslations API rate limit reached: Rate limit
+                    of 5 requests per hour exceeded. Please wait for 45 minutes
+                    and 9 seconds."}
+        '404':
+          description: No Pokémon with such that name was found.
+      servers:
+        - url: 'http://localhost:8080'
+    servers:
+      - url: 'http://localhost:8080'

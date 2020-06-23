@@ -63,7 +63,7 @@ impl ResponseError for Error {
                 HttpResponse::InternalServerError().finish(),
             Error::TranslationApiRate(msg) => {
                 let msg = format!("FunTranslations API rate limit reached: {}", msg);
-                HttpResponse::InternalServerError()
+                HttpResponse::TooManyRequests()
                     .json(HttpError { error: msg })
             }
         }
